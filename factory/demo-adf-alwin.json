@@ -1,0 +1,21 @@
+{
+	"name": "demo-adf-alwin",
+	"properties": {
+		"globalParameters": {
+			"email_recepient": {
+				"type": "string",
+				"value": "alwinpinto@hotmail.com"
+			}
+		},
+		"trustModeClaimForMi": {
+			"value": "Disabled",
+			"editable": true
+		}
+	},
+	"location": "centralindia",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "1f3456c5-ece6-4591-8569-39dec4fd812c",
+		"tenantId": "d5f4fc39-3564-46cc-b231-5e74d0b31b75"
+	}
+}

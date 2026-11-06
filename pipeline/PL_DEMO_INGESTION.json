@@ -1,0 +1,285 @@
+{
+	"name": "PL_DEMO_INGESTION",
+	"properties": {
+		"activities": [
+			{
+				"name": "Execute_Send_Email_Pipeline",
+				"type": "ExecutePipeline",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [
+					{
+						"activity": "Check Source Count",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_EMAIL_DEMO",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"table_name": {
+							"value": "@{pipeline().parameters.table_name}",
+							"type": "Expression"
+						},
+						"status": "SUCCESS",
+						"email_recepient": {
+							"value": "@pipeline().globalParameters.email_recepient",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Execute_Send_Email_Pipeline_for_failure",
+				"type": "ExecutePipeline",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [
+					{
+						"activity": "Check Source Count",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_EMAIL_DEMO",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"table_name": {
+							"value": "@{pipeline().parameters.table_name}",
+							"type": "Expression"
+						},
+						"status": "FAILED",
+						"email_recepient": {
+							"value": "@pipeline().globalParameters.email_recepient",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "ReadWaterMark",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT  watermark_value FROM [metadata].[table_watermarks] where table_name = '@{toLower(pipeline().parameters.table_name)}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_SQL_SERVER",
+						"type": "DatasetReference",
+						"parameters": {
+							"schema": "ab",
+							"table_name": "abc"
+						}
+					}
+				}
+			},
+			{
+				"name": "Check Source Count",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Check Count in Source",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@greater(activity('Check Count in Source').output.firstRow.count,0)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "Ingest_SQL_Db_Data",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "Select *from dbo.customers where modifieddate > '@{activity('ReadWaterMark').output.firstRow.watermark_value}'",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_SQL_SERVER",
+									"type": "DatasetReference",
+									"parameters": {
+										"schema": "dbo",
+										"table_name": {
+											"value": "@pipeline().parameters.table_name",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_ADLS_CSV_DEMO",
+									"type": "DatasetReference",
+									"parameters": {
+										"table_name": {
+											"value": "@pipeline().parameters.table_name",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "UpdateWatermark",
+							"type": "Script",
+							"dependsOn": [
+								{
+									"activity": "Ingest_SQL_Db_Data",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "LS_SQL_SERVER",
+								"type": "LinkedServiceReference"
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "Query",
+										"text": {
+											"value": "Update  [metadata].[table_watermarks] \nset watermark_value=SYSUTCDATETIME()\nwhere table_name = '@{pipeline().parameters.table_name}'",
+											"type": "Expression"
+										}
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Check Count in Source",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "ReadWaterMark",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "Select count(*) as count From dbo.@{pipeline().parameters.table_name} where modifieddate > '@{activity('ReadWaterMark').output.firstRow.watermark_value}'\n\n",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_SQL_SERVER",
+						"type": "DatasetReference",
+						"parameters": {
+							"schema": "abc",
+							"table_name": "abc"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"table_name": {
+				"type": "string",
+				"defaultValue": "customers"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2026-11-03T09:51:50Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

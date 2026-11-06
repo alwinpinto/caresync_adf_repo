@@ -1,0 +1,19 @@
+{
+	"name": "DS_BINARY_TARGET",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_ADLS",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": "target_folder2",
+				"fileSystem": "target"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

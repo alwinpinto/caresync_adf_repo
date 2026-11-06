@@ -1,0 +1,28 @@
+{
+	"name": "trigger1",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Started",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "pipeline_Evnet_Trigger",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"file_name": "@triggerbody().filename"
+				}
+			}
+		],
+		"type": "BlobEventsTrigger",
+		"typeProperties": {
+			"blobPathBeginsWith": "/source/blobs/source_folder",
+			"blobPathEndsWith": "txt",
+			"ignoreEmptyBlobs": true,
+			"scope": "/subscriptions/d4559d03-1fe0-4620-bfb3-a5a056668367/resourceGroups/test/providers/Microsoft.Storage/storageAccounts/demoalwinadls",
+			"events": [
+				"Microsoft.Storage.BlobCreated"
+			]
+		}
+	}
+}
