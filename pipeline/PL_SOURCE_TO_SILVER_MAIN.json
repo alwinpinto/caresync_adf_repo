@@ -32,7 +32,7 @@
 				}
 			},
 			{
-				"name": "ForEachIngestion",
+				"name": "IngestionAllTables",
 				"type": "ForEach",
 				"dependsOn": [
 					{
@@ -61,7 +61,7 @@
 							"typeProperties": {
 								"variableName": "TableID",
 								"value": {
-									"value": "@item().table_id",
+									"value": "@string(item().table_id)",
 									"type": "Expression"
 								}
 							}
